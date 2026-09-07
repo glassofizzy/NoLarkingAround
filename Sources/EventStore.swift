@@ -284,7 +284,8 @@ final class EventStore {
             attendees: attendees,
             myOpenID: myOpenID,
             myDisplayName: myDisplayName,
-            clash: classified.clash
+            clash: classified.clash,
+            roomPriority: config.roomPriority
         )
     }
 }

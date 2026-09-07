@@ -62,7 +62,9 @@ func printAgenda(explain: String?) {
                     + "organizer=\(a.isOrganizer.map(String.init) ?? "-")  "
                     + "id=\(a.userID ?? "-")  name=\(a.displayName ?? "-")")
             }
-            let room = MeetingAlert.parseRoom(attendees: attendees, locationName: hit.location?.name)
+            let room = MeetingAlert.parseRoom(attendees: attendees,
+                                              locationName: hit.location?.name,
+                                              priority: config.roomPriority)
             print("  parsed room slab: \(room.slab ?? "<none>")")
             print("  parsed floor    : \(room.floor ?? "<none>")")
         } catch let e as LarkError {

@@ -66,6 +66,8 @@ Any subset of keys is valid; absent keys keep their defaults.
   "pollSeconds": 60,
   "requireOtherAttendees": true,
   "requireAccepted": true,
+  "attendeeCacheSeconds": 300,
+  "roomPriority": ["CPT"],
   "ignoreKeywords": ["lunch", "focus", "block", "hold", "ooo"],
   "quietHours": { "start": "22:00", "end": "08:00" },
   "soundName": "Submarine",
@@ -74,6 +76,10 @@ Any subset of keys is valid; absent keys keep their defaults.
 ```
 
 `requireAccepted: false` also alerts on meetings you have not answered yet.
+
+`roomPriority` decides which room to show when an event books several offices
+at once — the first room whose name contains the earliest-listed pattern wins.
+Default `["CPT"]` prefers Capital Tower in Singapore over a Jakarta room.
 
 ## Limitations
 

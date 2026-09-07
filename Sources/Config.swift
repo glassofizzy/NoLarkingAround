@@ -14,6 +14,10 @@ struct Config: Codable {
     /// How long an attendee list stays cached. Rooms and guests can change
     /// after the first poll, so this must expire before the meeting starts.
     var attendeeCacheSeconds: Int = 300
+    /// When an event books rooms in several offices, show the first room whose
+    /// name contains the earliest-listed pattern. Defaults to Capital Tower in
+    /// Singapore; a Jakarta room is no use to someone sitting in SG.
+    var roomPriority: [String] = ["CPT"]
     var ignoreKeywords: [String] = ["lunch", "focus", "block", "hold", "ooo"]
     var quietHours: QuietHours? = QuietHours(start: "22:00", end: "08:00")
     var soundName: String = "Submarine"
@@ -40,6 +44,7 @@ struct Config: Codable {
         requireOtherAttendees = try v(.requireOtherAttendees, d.requireOtherAttendees)
         requireAccepted       = try v(.requireAccepted, d.requireAccepted)
         attendeeCacheSeconds  = try v(.attendeeCacheSeconds, d.attendeeCacheSeconds)
+        roomPriority          = try v(.roomPriority, d.roomPriority)
         ignoreKeywords        = try v(.ignoreKeywords, d.ignoreKeywords)
         quietHours            = try c.decodeIfPresent(QuietHours.self, forKey: .quietHours)
                                     ?? d.quietHours

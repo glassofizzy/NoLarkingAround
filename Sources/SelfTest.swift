@@ -386,6 +386,44 @@ enum SelfTest {
                   EventStore.failureTTL < ttl)
         }
 
+        print("\n17. Multi-office room priority")
+        do {
+            let jakarta = "NTC-L05-C6(16) ID - Green Office Park"
+            let singapore = "CPT-L10-A9(7) SG - Capital Tower"
+
+            check("prefers CPT when Jakarta is listed first",
+                  MeetingAlert.pickRoom(from: [jakarta, singapore],
+                                        priority: ["CPT"]) == singapore)
+            check("prefers CPT when Singapore is listed first",
+                  MeetingAlert.pickRoom(from: [singapore, jakarta],
+                                        priority: ["CPT"]) == singapore)
+            check("falls back to the only room available",
+                  MeetingAlert.pickRoom(from: [jakarta], priority: ["CPT"]) == jakarta)
+            check("no rooms yields nothing",
+                  MeetingAlert.pickRoom(from: [], priority: ["CPT"]) == nil)
+            check("priority order is honoured",
+                  MeetingAlert.pickRoom(from: [singapore, jakarta],
+                                        priority: ["NTC", "CPT"]) == jakarta)
+            check("empty priority keeps API order",
+                  MeetingAlert.pickRoom(from: [jakarta, singapore],
+                                        priority: []) == jakarta)
+            check("matching is case-insensitive",
+                  MeetingAlert.pickRoom(from: [jakarta, singapore],
+                                        priority: ["cpt"]) == singapore)
+            check("also matches the SG-CPT device naming",
+                  MeetingAlert.pickRoom(from: [jakarta, "SG-CPT-L10-A9"],
+                                        priority: ["CPT"]) == "SG-CPT-L10-A9")
+
+            // End to end through parseRoom, both rooms present.
+            let picked = MeetingAlert.parseRoom(
+                attendees: [FakeRoom.make(jakarta), FakeRoom.make(singapore)],
+                locationName: nil, priority: ["CPT"])
+            check("slab is the Singapore room", picked.slab == "CPT-L10-A9(7)",
+                  "got \(picked.slab ?? "nil")")
+            check("floor is SG · Capital Tower", picked.floor == "SG · Capital Tower",
+                  "got \(picked.floor ?? "nil")")
+        }
+
         print(failures == 0
             ? "\nall checks passed"
             : "\n\(failures) check(s) FAILED")

@@ -68,7 +68,8 @@ extension MeetingAlert {
         attendees: [LarkAttendee],
         myOpenID: String?,
         myDisplayName: String?,
-        clash: LarkEvent?
+        clash: LarkEvent?,
+        roomPriority: [String] = ["CPT"]
     ) -> MeetingAlert? {
         guard let start = event.start, let end = event.end else { return nil }
 
@@ -93,7 +94,9 @@ extension MeetingAlert {
         let shown = Array(names.prefix(2))
         let overflow = names.count - shown.count
 
-        let room = parseRoom(attendees: attendees, locationName: event.location?.name)
+        let room = parseRoom(attendees: attendees,
+                             locationName: event.location?.name,
+                             priority: roomPriority)
 
         return MeetingAlert(
             eventID: event.eventID,
@@ -125,11 +128,15 @@ extension MeetingAlert {
     ///   floor = "SG · Capital Tower"
     /// With no room resource we fall back to the event's free-text location in the
     /// slab and show no floor line. With neither, both are hidden.
-    static func parseRoom(attendees: [LarkAttendee], locationName: String?)
+    static func parseRoom(attendees: [LarkAttendee], locationName: String?,
+                          priority: [String] = ["CPT"])
         -> (slab: String?, floor: String?) {
 
-        let rooms = attendees.filter { $0.isRoom }.compactMap { $0.displayName }
-        guard let raw = rooms.first?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else {
+        let rooms = attendees.filter { $0.isRoom }
+            .compactMap { $0.displayName }
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        guard let raw = pickRoom(from: rooms, priority: priority), !raw.isEmpty else {
             let loc = locationName?.trimmingCharacters(in: .whitespacesAndNewlines)
             return (loc?.isEmpty == false ? loc : nil, nil)
         }
@@ -155,6 +162,21 @@ extension MeetingAlert {
 
         let floor = [region, building].compactMap { $0 }.joined(separator: " · ")
         return (head.isEmpty ? raw : head, floor.isEmpty ? nil : floor)
+    }
+
+    /// Rooms often span offices — an event can book Jakarta and Singapore at once.
+    /// Choose the first room matching the earliest priority pattern, so the slab
+    /// names the room the user can actually walk to. Falls back to the first room
+    /// when nothing matches, rather than showing none.
+    static func pickRoom(from rooms: [String], priority: [String]) -> String? {
+        for pattern in priority where !pattern.isEmpty {
+            if let hit = rooms.first(where: {
+                $0.range(of: pattern, options: .caseInsensitive) != nil
+            }) {
+                return hit
+            }
+        }
+        return rooms.first
     }
 
     // MARK: Formatting
