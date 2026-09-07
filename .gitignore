@@ -1,0 +1,10 @@
+# Build output — regenerate with ./build.sh
+InYourLark.app/
+inyourlark
+
+# Generated design-QA renders
+takeover-render.png
+*-snapshot.png
+
+# macOS
+.DS_Store
