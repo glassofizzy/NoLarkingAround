@@ -1,25 +1,53 @@
-# In Your Lark
+# No Larking Around
 
 A full-screen meeting takeover for **Lark Calendar** on macOS — the thing
 [inyourface.app](https://www.inyourface.app/) does for Google/Outlook/iCloud, which
 do not include Lark.
 
-A menu-bar agent polls your Lark calendar through `lark-cli` and, 3 minutes before
-each real meeting, blocks every display with the takeover screen from
-`../design_handoff_takeover_reminder/`.
+A menu-bar agent polls your Lark calendar through `lark-cli` and, a few minutes
+before each real meeting, blocks every display with a full-screen takeover so you
+can't miss it.
+
+**[Screenshot: full-screen takeover — meeting title, time, room, attendees, Join button]**
+
+![Takeover design render](takeover-render.png)
+
+**[Screenshot: menu bar dropdown — next meeting countdown, pause / lead-time / test-takeover / re-auth actions]**
+
+## Features
+
+- **Full-screen, unmissable.** One borderless window per display, above fullscreen apps.
+- **Smart filtering.** Skips all-day events, declined invites, solo blocks (no other
+  attendee), and anything matching your ignore-keyword list — so "Lunch" and "Focus
+  block" never take over the screen.
+- **Fires twice, safely.** A lead-time alert before the meeting, and a fallback at
+  the start time if you missed the first one — deduplicated per occurrence.
+- **Clash-aware.** Shows what else is competing for that slot.
+- **Sleep-safe.** A fire time that passed while the Mac was asleep is skipped, not
+  fired late in a burst.
+- **Fail-open.** If the attendee lookup can't be performed, it alerts anyway — a
+  lookup failure must never cause a missed meeting.
 
 ## Build
 
 ```bash
-./build.sh          # produces InYourLark.app — needs only Command Line Tools
+./build.sh          # produces NoLarkingAround.app — needs only Command Line Tools
 ```
 
 No Xcode project, no SwiftPM, no third-party dependencies.
 
+> **Note:** on recent Swift toolchains, building needs a full Xcode.app install —
+> not just Command Line Tools. `TakeoverView.swift` uses SwiftUI property wrappers
+> (`@State`, `.onReceive`, `.onHover`) that compile through a macro plugin
+> (`SwiftUIMacros`) that ships inside Xcode.app, not with standalone CLT. If
+> `./build.sh` fails with `external macro implementation type ... could not be
+> found`, run `xcode-select -s /Applications/Xcode.app` (installing Xcode first if
+> you don't have it) and try again.
+
 ## Run
 
 ```bash
-open InYourLark.app                 # menu-bar agent, no dock icon
+open NoLarkingAround.app             # menu-bar agent, no dock icon
 ./install-login-item.sh             # optional: start at login
 ```
 
@@ -31,10 +59,10 @@ lead time, a test takeover, and re-authentication.
 ## Verify
 
 ```bash
-./inyourlark --selftest        # 30 checks: alert lifecycle, room parsing, filters
-./inyourlark --print-agenda    # next 18h, with each event's alert/skip verdict
-./inyourlark --print-agenda --explain <event_id>    # raw attendee response
-./inyourlark --snapshot out.png --lead 15 --minutes 3 --scale 1   # design QA
+./nolarkingaround --selftest        # 30 checks: alert lifecycle, room parsing, filters
+./nolarkingaround --print-agenda    # next 18h, with each event's alert/skip verdict
+./nolarkingaround --print-agenda --explain <event_id>    # raw attendee response
+./nolarkingaround --snapshot out.png --lead 15 --minutes 3 --scale 1   # design QA
 ```
 
 `--snapshot` renders offscreen, so design work never hijacks your display. The
@@ -54,7 +82,7 @@ matched by an ignore keyword, has at least one other human attendee, and you hav
 accepted it. If the attendee lookup fails the event **still alerts** — a lookup we
 cannot perform must never cause a missed meeting.
 
-## Config — `~/.config/inyourlark/config.json`
+## Config — `~/.config/nolarkingaround/config.json`
 
 Any subset of keys is valid; absent keys keep their defaults.
 
@@ -80,6 +108,14 @@ Any subset of keys is valid; absent keys keep their defaults.
 `roomPriority` decides which room to show when an event books several offices
 at once — the first room whose name contains the earliest-listed pattern wins.
 Default `["CPT"]` prefers Capital Tower in Singapore over a Jakarta room.
+
+## Diagnosing a missed alert
+
+If a takeover didn't fire when you expected it to, check `/tmp/nolarkingaround.err`
+(the login-item's stderr) for a timestamped trace of pause/resume toggles, blocked
+fires (already-showing takeover, paused, or quiet hours), and successful fires.
+`./nolarkingaround --print-agenda` shows the same verdict logic for the next 18h,
+but only looks forward from "now" — it won't explain a meeting that already passed.
 
 ## Limitations
 
@@ -117,3 +153,9 @@ Resources/Fonts/        Schibsted Grotesk + JetBrains Mono (OFL, licences includ
 ```
 
 Fonts are OFL-licensed; their licence files ship in `Resources/Fonts/`.
+
+## License
+
+MIT — see [LICENSE](LICENSE). The bundled fonts (Schibsted Grotesk, JetBrains
+Mono) are separately OFL-licensed; see `Resources/Fonts/` for their license
+files.

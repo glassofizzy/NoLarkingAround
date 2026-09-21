@@ -1,16 +1,16 @@
 #!/bin/bash
-# Builds InYourLark.app. No Xcode project required — Command Line Tools suffice.
+# Builds NoLarkingAround.app. No Xcode project required — Command Line Tools suffice.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP="InYourLark.app"
+APP="NoLarkingAround.app"
 CONTENTS="$APP/Contents"
 
 rm -rf "$APP"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources/Fonts"
 
 echo "compiling…"
-swiftc -swift-version 5 -O Sources/*.swift -o "$CONTENTS/MacOS/InYourLark"
+swiftc -swift-version 5 -O Sources/*.swift -o "$CONTENTS/MacOS/NoLarkingAround"
 
 cp Resources/Fonts/*.ttf "$CONTENTS/Resources/Fonts/"
 cp Resources/Fonts/OFL-*.txt "$CONTENTS/Resources/Fonts/"
@@ -20,10 +20,10 @@ cat > "$CONTENTS/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>InYourLark</string>
-  <key>CFBundleDisplayName</key><string>In Your Lark</string>
-  <key>CFBundleIdentifier</key><string>com.traveloka.inyourlark</string>
-  <key>CFBundleExecutable</key><string>InYourLark</string>
+  <key>CFBundleName</key><string>NoLarkingAround</string>
+  <key>CFBundleDisplayName</key><string>No Larking Around</string>
+  <key>CFBundleIdentifier</key><string>com.traveloka.nolarkingaround</string>
+  <key>CFBundleExecutable</key><string>NoLarkingAround</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.0</string>
   <key>CFBundleVersion</key><string>1</string>
@@ -41,5 +41,9 @@ printf 'APPL????' > "$CONTENTS/PkgInfo"
 # Ad-hoc signature: enough for a locally built binary, not notarised.
 codesign --force --deep --sign - "$APP" >/dev/null 2>&1 \
   && echo "ad-hoc signed" || echo "warning: codesign failed (app will still run)"
+
+# Top-level CLI convenience copy — used by --selftest/--print-agenda/--snapshot
+# without going through the .app bundle.
+cp "$CONTENTS/MacOS/NoLarkingAround" nolarkingaround
 
 echo "built $APP"

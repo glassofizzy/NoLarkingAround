@@ -1,6 +1,6 @@
 import Foundation
 
-/// User-editable settings, stored at ~/.config/inyourlark/config.json.
+/// User-editable settings, stored at ~/.config/nolarkingaround/config.json.
 /// Missing keys fall back to these defaults, so a partial file is valid.
 struct Config: Codable {
     var leadMinutes: Int = 3
@@ -56,7 +56,7 @@ struct Config: Codable {
 
     static var fileURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".config/inyourlark/config.json")
+            .appendingPathComponent(".config/nolarkingaround/config.json")
     }
 
     static func load() -> Config {
@@ -65,7 +65,7 @@ struct Config: Codable {
             return try JSONDecoder().decode(Config.self, from: data)
         } catch {
             FileHandle.standardError.write(
-                "inyourlark: config.json is invalid (\(error)); using defaults\n".data(using: .utf8)!)
+                "nolarkingaround: config.json is invalid (\(error)); using defaults\n".data(using: .utf8)!)
             return Config()
         }
     }

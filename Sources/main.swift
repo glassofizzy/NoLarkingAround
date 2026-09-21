@@ -282,7 +282,7 @@ if !has("--help") && !has("-h") {
 }
 
 print("""
-InYourLark — full-screen Lark meeting takeover
+No Larking Around — full-screen Lark meeting takeover
 
   --selftest                  run the alert-lifecycle checks
   --print-agenda              classify the next 18h and show derived design fields

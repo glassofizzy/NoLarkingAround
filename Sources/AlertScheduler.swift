@@ -47,7 +47,7 @@ final class AlertScheduler {
 
     /// All EventStore access is serialised here. Each lark-cli call spawns node and
     /// costs a few hundred ms, so doing this on main would stall the menu bar.
-    private let larkQueue = DispatchQueue(label: "com.traveloka.inyourlark.lark")
+    private let larkQueue = DispatchQueue(label: "com.traveloka.nolarkingaround.lark")
 
     private var tick: Timer?
     private var showingEventID: String?
@@ -57,6 +57,17 @@ final class AlertScheduler {
     private(set) var pausedUntil: Date?
 
     var onStateChange: (() -> Void)?
+
+    /// Event ids already logged as blocked, so a stuck pause/takeover doesn't spam
+    /// one line per second — reset once the alert leaves its fire window.
+    private var loggedBlocked: Set<String> = []
+
+    /// Timestamped line to stderr, which launchd's StandardErrorPath sends to
+    /// /tmp/nolarkingaround.err — the only trace of *why* an alert did or didn't fire.
+    private func log(_ message: String) {
+        let ts = ISO8601DateFormatter().string(from: clock())
+        FileHandle.standardError.write("[\(ts)] \(message)\n".data(using: .utf8)!)
+    }
 
     init(store: EventStore, takeover: TakeoverPresenting, config: Config) {
         self.store = store
@@ -113,12 +124,14 @@ final class AlertScheduler {
 
     func pause(until date: Date) {
         pausedUntil = date
+        log("paused until \(ISO8601DateFormatter().string(from: date))")
         takeover.teardown()
         showingEventID = nil
         onStateChange?()
     }
 
     func resume() {
+        log("resumed")
         pausedUntil = nil
         onStateChange?()
     }
@@ -188,7 +201,10 @@ final class AlertScheduler {
             autoClearAt = nil
         }
 
-        guard !takeover.isShowing, !isPaused, !config.isQuiet(at: now) else { return }
+        let blockedReason: String? =
+            takeover.isShowing ? "a takeover is already showing" :
+            isPaused ? "paused until \(ISO8601DateFormatter().string(from: pausedUntil!))" :
+            config.isQuiet(at: now) ? "quiet hours" : nil
 
         for alert in currentAlerts() {
             var state = states[alert.eventID] ?? AlertState()
@@ -197,12 +213,25 @@ final class AlertScheduler {
             let leadAt = alert.start.addingTimeInterval(-Double(config.leadMinutes) * 60)
             let startAt = alert.start
 
+            if let blockedReason {
+                let inFireWindow = now >= leadAt
+                    && now < startAt.addingTimeInterval(TimeInterval(config.autoClearSeconds))
+                if inFireWindow, !loggedBlocked.contains(alert.eventID) {
+                    loggedBlocked.insert(alert.eventID)
+                    log("'\(alert.title)' would have fired but \(blockedReason)")
+                } else if !inFireWindow {
+                    loggedBlocked.remove(alert.eventID)
+                }
+                continue
+            }
+
             // Lead alert: only inside [leadAt, start). Past that we let the
             // at-start alert handle it rather than firing a stale takeover.
             if !state.firedLead, !state.snoozedUntilStart,
                now >= leadAt, now < startAt {
                 state.firedLead = true
                 states[alert.eventID] = state
+                log("fired lead alert for '\(alert.title)'")
                 // Must have an auto-clear too: an ignored lead takeover would
                 // otherwise sit on screen indefinitely, since `isShowing` blocks
                 // the at-start alert from ever replacing it.
@@ -216,6 +245,7 @@ final class AlertScheduler {
                now < startAt.addingTimeInterval(TimeInterval(config.autoClearSeconds)) {
                 state.firedStart = true
                 states[alert.eventID] = state
+                log("fired at-start alert for '\(alert.title)'")
                 present(alert, autoClear: startAt.addingTimeInterval(
                     TimeInterval(config.autoClearSeconds)))
                 return

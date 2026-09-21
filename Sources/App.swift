@@ -114,7 +114,7 @@ final class AgentDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Open config…",
                                 action: #selector(openConfig), keyEquivalent: ""))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit In Your Lark",
+        menu.addItem(NSMenuItem(title: "Quit No Larking Around",
                                 action: #selector(quit), keyEquivalent: "q"))
 
         for item in menu.items where item.action != nil { item.target = self }
