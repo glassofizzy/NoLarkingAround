@@ -1,8 +1,6 @@
 # No Larking Around
 
-A full-screen meeting takeover for **Lark Calendar** on macOS — the thing
-[inyourface.app](https://www.inyourface.app/) does for Google/Outlook/iCloud, which
-do not include Lark.
+A full-screen meeting takeover for **Lark Calendar** on macOS for Lark users
 
 A menu-bar agent polls your Lark calendar through `lark-cli` and, a few minutes
 before each real meeting, blocks every display with a full-screen takeover so you
