@@ -26,28 +26,57 @@ can't miss it.
 - **Fail-open.** If the attendee lookup can't be performed, it alerts anyway — a
   lookup failure must never cause a missed meeting.
 
-## Build
+## Install
+
+### Prerequisites
+
+- **macOS 13 (Ventura) or later.**
+- **A full Xcode.app install** — not just Command Line Tools. Run `xcode-select -p`
+  and confirm it points at `/Applications/Xcode.app`. Recent Swift toolchains
+  compile SwiftUI's `@State` / `.onReceive` / `.onHover` (used in
+  `TakeoverView.swift`) through a macro plugin (`SwiftUIMacros`) that ships
+  inside Xcode.app, not with standalone Command Line Tools. If `./build.sh`
+  fails with `external macro implementation type ... could not be found`, run
+  `xcode-select -s /Applications/Xcode.app` (installing Xcode from the App
+  Store first if you don't have it) and try again.
+- **`lark-cli`, installed and authenticated against your own Lark/Feishu
+  account.** This README can't point you to it — it isn't a public package
+  this project ships or distributes, so install and authenticate it however
+  your own workspace already does, then confirm `lark-cli auth status` reports
+  a valid token, before continuing.
+- **[Claude Code](https://claude.com/claude-code)** — optional, but it can run
+  every step below for you and diagnose build errors (like the Xcode one
+  above) as they come up.
+
+### With Claude Code
 
 ```bash
-./build.sh          # produces NoLarkingAround.app — needs only Command Line Tools
+git clone https://github.com/glassofizzy/NoLarkingAround.git
+cd NoLarkingAround
+claude
 ```
 
-No Xcode project, no SwiftPM, no third-party dependencies.
+Then just ask it, in plain language:
 
-> **Note:** on recent Swift toolchains, building needs a full Xcode.app install —
-> not just Command Line Tools. `TakeoverView.swift` uses SwiftUI property wrappers
-> (`@State`, `.onReceive`, `.onHover`) that compile through a macro plugin
-> (`SwiftUIMacros`) that ships inside Xcode.app, not with standalone CLT. If
-> `./build.sh` fails with `external macro implementation type ... could not be
-> found`, run `xcode-select -s /Applications/Xcode.app` (installing Xcode first if
-> you don't have it) and try again.
+> Build this app and set it up to run at login on my Mac.
 
-## Run
+Claude Code will run `./build.sh`, walk you through the Xcode fix above if it
+hits that error, confirm `lark-cli` is authenticated, and run
+`./install-login-item.sh` once the build succeeds.
+
+### Manually
 
 ```bash
-open NoLarkingAround.app             # menu-bar agent, no dock icon
-./install-login-item.sh             # optional: start at login
+git clone https://github.com/glassofizzy/NoLarkingAround.git
+cd NoLarkingAround
+./build.sh                    # produces NoLarkingAround.app
+lark-cli auth login           # if lark-cli isn't already authenticated
+open NoLarkingAround.app       # menu-bar agent, no dock icon
+./install-login-item.sh       # optional: start at login
 ```
+
+No Xcode project file, no SwiftPM, no third-party dependencies — just the
+Swift compiler.
 
 The status item shows the next meeting (`◷ 12m · Metric Tree`) and offers pause,
 lead time, a test takeover, and re-authentication.
@@ -80,9 +109,11 @@ matched by an ignore keyword, has at least one other human attendee, and you hav
 accepted it. If the attendee lookup fails the event **still alerts** — a lookup we
 cannot perform must never cause a missed meeting.
 
-## Config — `~/.config/nolarkingaround/config.json`
+## Settings you can change
 
-Any subset of keys is valid; absent keys keep their defaults.
+Everything below is optional — edit `~/.config/nolarkingaround/config.json` to
+change how it behaves. Any subset of keys is valid; leave a key out and it
+keeps its default.
 
 ```json
 {
@@ -130,25 +161,6 @@ but only looks forward from "now" — it won't explain a meeting that already pa
   it is not notarised and not distributable to teammates as-is.
 - **iOS.** The handoff's phone frames are not built. `MeetingAlert` is deliberately
   platform-agnostic so a port is view code only.
-
-## Layout
-
-```
-Sources/
-  main.swift            CLI dispatch; default mode runs the agent
-  App.swift             Menu bar, ⌥⌘P hot key, actions
-  AlertScheduler.swift  Fire times, dismiss/snooze/auto-clear, pause, quiet hours
-  EventStore.swift      Poll, classify, attendee cache, clash detection
-  MeetingAlert.swift     View model + room parsing + formatting (no AppKit)
-  TakeoverView.swift    The design, recreated in SwiftUI
-  TakeoverWindow.swift  One borderless window per display, above fullscreen
-  DesignTokens.swift    Colours, fonts, variable-axis weight selection
-  LarkClient.swift      lark-cli over Process, envelope decoding
-  Models.swift          Lark wire types
-  Config.swift          Settings, partial-file tolerant
-  SelfTest.swift        Virtual-clock lifecycle checks
-Resources/Fonts/        Schibsted Grotesk + JetBrains Mono (OFL, licences included)
-```
 
 Fonts are OFL-licensed; their licence files ship in `Resources/Fonts/`.
 
