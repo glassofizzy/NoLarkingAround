@@ -7,6 +7,13 @@ enum TakeoverAction {
     case snoozeUntilStart
 }
 
+/// Command Line Tools' swiftc lacks the Xcode-only SwiftUIMacros plugin that
+/// `@State` compiles against on this SDK; `@StateObject`/`@Published` don't need it,
+/// so transient view-local state goes through this instead.
+private final class Clock: ObservableObject {
+    @Published var now = Date()
+}
+
 /// The desktop takeover, recreated natively from
 /// design_handoff_takeover_reminder/Takeover Reminder.dc.html.
 struct TakeoverView: View {
@@ -14,7 +21,8 @@ struct TakeoverView: View {
     let leadMinutes: Int
     let onAction: (TakeoverAction) -> Void
 
-    @State private var now = Date()
+    @StateObject private var clock = Clock()
+    private var now: Date { clock.now }
 
     private let tick = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -26,7 +34,7 @@ struct TakeoverView: View {
         .background(DS.ground)
         .foregroundStyle(DS.ink)
         .clipped()
-        .onReceive(tick) { now = $0 }
+        .onReceive(tick) { clock.now = $0 }
     }
 
     // MARK: - Draining wall
@@ -355,6 +363,10 @@ struct NeoButtonStyle: ButtonStyle {
     }
 }
 
+private final class HoverState: ObservableObject {
+    @Published var hovering = false
+}
+
 private struct NeoButtonSurface: View {
     let configuration: ButtonStyle.Configuration
     let radius: CGFloat
@@ -363,7 +375,8 @@ private struct NeoButtonSurface: View {
     let hoverShadow: CGFloat
     let activeShadow: CGFloat
 
-    @State private var hovering = false
+    @StateObject private var hoverState = HoverState()
+    private var hovering: Bool { hoverState.hovering }
 
     var body: some View {
         // normal: offset 0, shadow 5 · hover: offset -1, shadow 7 · active: offset +2, shadow 2
@@ -383,7 +396,7 @@ private struct NeoButtonSurface: View {
         .offset(x: offset, y: offset)
         .animation(.timingCurve(0.2, 0, 0, 1, duration: 0.14), value: pressed)
         .animation(.timingCurve(0.2, 0, 0, 1, duration: 0.14), value: hovering)
-        .onHover { hovering = $0 }
+        .onHover { hoverState.hovering = $0 }
     }
 }
 

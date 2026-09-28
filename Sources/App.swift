@@ -201,15 +201,24 @@ final class AgentDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.open(Config.fileURL)
     }
 
-    /// `lark-cli auth login` is interactive, so it needs a real terminal.
+    /// `lark-cli auth login` is interactive, so it needs a real terminal. We open a
+    /// `.command` file via LaunchServices rather than AppleScript-driving Terminal —
+    /// the AppleScript route needs Automation (Apple Events) permission that this
+    /// LaunchAgent-run app has no reliable way to prompt for, and failed silently.
     @objc private func reauth() {
-        let script = """
-        tell application "Terminal"
-            activate
-            do script "\(config.larkCLIPath) auth login"
-        end tell
-        """
-        NSAppleScript(source: script)?.executeAndReturnError(nil)
+        let script = "#!/bin/bash\nexec \"\(config.larkCLIPath)\" auth login\n"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("nolarkingaround-reauth-\(UUID().uuidString).command")
+        do {
+            try script.write(to: url, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+            NSWorkspace.shared.open(url)
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Couldn't open a terminal to re-authenticate"
+            alert.informativeText = "Run this manually in Terminal:\n\(config.larkCLIPath) auth login\n\n(\(error.localizedDescription))"
+            alert.runModal()
+        }
     }
 
     @objc private func quit() { NSApp.terminate(nil) }
