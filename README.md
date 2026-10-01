@@ -78,8 +78,11 @@ open NoLarkingAround.app       # menu-bar agent, no dock icon
 No Xcode project file, no SwiftPM, no third-party dependencies — just the
 Swift compiler.
 
-The status item shows the next meeting (`◷ 12m · Metric Tree`) and offers pause,
-lead time, a test takeover, and re-authentication.
+The menu bar shows a yellow pill with a countdown to the next meeting (`[12m] Metric
+Tree`). Clicking it opens a dropdown in the takeover's style, listing upcoming
+meetings by day. From there you can pause, change the lead time, run a test
+takeover and re-authenticate. The dropdown works with the keyboard too: ↑ ↓ to move,
+Return to choose, → to open the lead-time options, Esc to close.
 
 **⌥⌘P pauses alerts for an hour.** Use it before you present — see Limitations.
 
@@ -154,7 +157,7 @@ but only looks forward from "now" — it won't explain a meeting that already pa
   Pause from the menu.
 - **Lark token.** `lark-cli` refreshes automatically, but the refresh grant expires
   periodically; after that the calendar is unreadable until `lark-cli auth login` is
-  re-run. The menu bar shows ⚠️ rather than failing silently.
+  re-run. The menu-bar pill switches to "! Lark sign-in" rather than failing silently.
 - **Mac must be awake.** Fire times that passed while asleep are skipped rather
   than firing a burst of stale takeovers.
 - **Unsigned.** Ad-hoc signed, so it runs locally without a Gatekeeper prompt, but

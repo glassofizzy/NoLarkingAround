@@ -230,6 +230,74 @@ func snapshot(to path: String, width: CGFloat, height: CGFloat,
     }
 }
 
+/// Renders the status pill above the dropdown panel, with sample meetings, so the
+/// menu design can be checked without clicking the real menu bar.
+@available(macOS 13.0, *)
+@MainActor
+func snapshotMenu(to path: String, paused: Bool, authExpired: Bool, expanded: Bool,
+                  leadMinutes: Int, scale: CGFloat) {
+    FontLoader.shared.register()
+
+    let now = Date()
+    let cal = Calendar.current
+    func at(_ dayOffset: Int, _ h: Int, _ m: Int) -> Date {
+        let day = cal.date(byAdding: .day, value: dayOffset, to: now) ?? now
+        return cal.date(bySettingHour: h, minute: m, second: 0, of: day) ?? now
+    }
+    func meeting(_ title: String, _ start: Date) -> MeetingAlert {
+        MeetingAlert(eventID: title, title: title, start: start,
+                     end: start.addingTimeInterval(1800), timeRange: "", durationLabel: "",
+                     attendanceLabel: "", roomSlab: nil, floorLabel: nil, hostName: "",
+                     hostTag: "", hostIsMe: false, participantNames: [], moreLabel: nil,
+                     joinURL: nil, clashLabel: nil)
+    }
+    // Sample day relative to "now" so the header reads TODAY / TOMORROW.
+    let upcoming = [
+        meeting("Payment x Accomm Biweekly", now.addingTimeInterval(67 * 60)),
+        meeting("Google & Expedia UGC Accom Content", now.addingTimeInterval(3 * 3600)),
+        meeting("GHA Multi-Rate Project - Weekly Sync", at(1, 9, 30)),
+    ]
+
+    let model = MenuViewModel()
+    model.snapshot = MenuSnapshot.make(
+        upcoming: upcoming, now: now, authExpired: authExpired,
+        errorText: nil, isPaused: paused, leadMinutes: leadMinutes)
+    model.leadExpanded = expanded
+    model.highlighted = expanded ? .lead(leadMinutes == 5 ? 3 : 5) : .pauseTomorrow
+
+    let pill = PillState.make(next: upcoming.first, now: now,
+                              authExpired: authExpired, isPaused: paused)
+    let view = VStack(alignment: .leading, spacing: 10) {
+        StatusPillView(state: pill)
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(DS.ground)
+        MenuPanelView(model: model)
+            .padding(.horizontal, 8)
+    }
+    .padding(.bottom, 10)
+    .frame(width: MenuPanelView.width + MenuPanelView.shadowOffset + 16)
+    .background(DS.paper)
+
+    let renderer = ImageRenderer(content: view)
+    renderer.scale = scale
+    guard let cg = renderer.cgImage else { fail("could not render menu snapshot") }
+    let rep = NSBitmapImageRep(cgImage: cg)
+    guard let data = rep.representation(using: .png, properties: [:]) else {
+        fail("could not encode PNG")
+    }
+    do {
+        try data.write(to: URL(fileURLWithPath: path))
+    } catch {
+        fail("could not write \(path): \(error)")
+    }
+    print("wrote \(path)  \(cg.width)x\(cg.height)")
+    if FontLoader.shared.didFallBack {
+        print("warning: bundled fonts did not load; system fallback was used")
+    }
+}
+
 // MARK: - Dispatch
 
 if has("--selftest") {
@@ -260,6 +328,23 @@ if let out = value(after: "--snapshot") {
         exit(0)
     }
     fail("--snapshot needs macOS 13+")
+}
+
+if let out = value(after: "--snapshot-menu") {
+    if #available(macOS 13.0, *) {
+        MainActor.assumeIsolated {
+            snapshotMenu(
+                to: out,
+                paused: has("--paused"),
+                authExpired: has("--auth-expired"),
+                expanded: has("--expanded"),
+                leadMinutes: Int(value(after: "--lead") ?? "") ?? config.leadMinutes,
+                scale: CGFloat(Double(value(after: "--scale") ?? "") ?? 2)
+            )
+        }
+        exit(0)
+    }
+    fail("--snapshot-menu needs macOS 13+")
 }
 
 if has("--test-overlay") {
@@ -294,6 +379,11 @@ No Larking Around — full-screen Lark meeting takeover
   --snapshot PATH             render offscreen to a PNG (design QA)
       --width N --height N    snapshot size, default 1440x900
       --lead N --scale N      wall lead window and pixel scale
+  --snapshot-menu PATH        render the status pill + dropdown panel to a PNG
+      --paused                show the paused state
+      --auth-expired          show the Lark sign-in expired state
+      --expanded              show the lead-time options expanded
+      --lead N --scale N      current lead time and pixel scale
 
 With no flags, runs as a menu-bar agent.
 """)

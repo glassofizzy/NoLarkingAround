@@ -424,6 +424,81 @@ enum SelfTest {
                   "got \(picked.floor ?? "nil")")
         }
 
+        print("\nmenu bar")
+        do {
+            check("pill countdown: now", PillState.countdownText(minutes: 0) == "now")
+            check("pill countdown: under an hour", PillState.countdownText(minutes: 45) == "45m")
+            check("pill countdown: hours and minutes",
+                  PillState.countdownText(minutes: 67) == "1h7m")
+            check("paused pill wins over a countdown",
+                  PillState.make(next: sample, now: t0, authExpired: false, isPaused: true).text
+                      == "Paused")
+
+            var utc = Calendar(identifier: .gregorian)
+            utc.timeZone = TimeZone(identifier: "UTC")!
+            // Fri 4 Sep 2026, 22:00 UTC.
+            let fri = utc.date(from: DateComponents(year: 2026, month: 9, day: 4, hour: 22))!
+            func m(_ id: String, _ offsetMin: Double) -> MeetingAlert {
+                let s = fri.addingTimeInterval(offsetMin * 60)
+                return MeetingAlert(eventID: id, title: id, start: s,
+                                    end: s.addingTimeInterval(1800), timeRange: "",
+                                    durationLabel: "", attendanceLabel: "", roomSlab: nil,
+                                    floorLabel: nil, hostName: "", hostTag: "",
+                                    hostIsMe: false, participantNames: [], moreLabel: nil,
+                                    joinURL: nil, clashLabel: nil)
+            }
+            let snap = MenuSnapshot.make(
+                upcoming: [m("late", 30), m("early", 180), m("second", 240)],
+                now: fri, calendar: utc, authExpired: false, errorText: "x",
+                isPaused: false, leadMinutes: 3)
+            check("splits meetings across midnight into two days", snap.groups.count == 2,
+                  "got \(snap.groups.count)")
+            check("today header", snap.groups.first?.header.hasPrefix("TODAY · FRI 4 SEP") == true,
+                  "got \(snap.groups.first?.header ?? "nil")")
+            check("tomorrow header", snap.groups.last?.header.hasPrefix("TOMORROW · SAT 5 SEP") == true,
+                  "got \(snap.groups.last?.header ?? "nil")")
+            let nextFlags = snap.groups.flatMap(\.rows).map(\.isNext)
+            check("only the first meeting is marked next", nextFlags == [true, false, false])
+            let inProgress = MenuSnapshot.make(
+                upcoming: [m("started yesterday", -180)], now: fri.addingTimeInterval(3 * 3600),
+                calendar: utc, authExpired: false, errorText: nil, isPaused: false,
+                leadMinutes: 3)
+            check("a meeting under way groups under today",
+                  inProgress.groups.first?.header.hasPrefix("TODAY") == true)
+            check("auth expiry hides the generic error",
+                  MenuSnapshot.make(upcoming: [], authExpired: true, errorText: "boom",
+                                    isPaused: false, leadMinutes: 3).errorText == nil)
+
+            let vm = MenuViewModel()
+            vm.move(1)
+            check("first ↓ highlights the first row", vm.highlighted == .pauseHour)
+            vm.move(-1)
+            check("↑ from the top wraps to Quit", vm.highlighted == .quit)
+            vm.highlighted = .leadTime
+            vm.activateHighlighted()
+            check("Return on Lead time expands it", vm.leadExpanded && vm.rows.contains(.lead(5)))
+            var fired: [MenuAction] = []
+            vm.onAction = { fired.append($0) }
+            vm.activate(.lead(5))
+            check("picking a lead time fires setLead and collapses",
+                  fired == [.setLead(5)] && !vm.leadExpanded && vm.highlighted == .leadTime)
+
+            let visible = NSRect(x: 0, y: 0, width: 1440, height: 875)
+            let size = NSSize(width: 386, height: 500)
+            let normal = MenuPanelController.frame(
+                button: NSRect(x: 600, y: 876, width: 200, height: 24), size: size, visible: visible)
+            check("panel sits under the button's left edge",
+                  normal.minX == 600 && normal.maxY == 872, "got \(normal)")
+            let edge = MenuPanelController.frame(
+                button: NSRect(x: 1400, y: 876, width: 40, height: 24), size: size, visible: visible)
+            check("panel at the right edge stays on screen",
+                  edge.maxX <= visible.maxX && edge.minX >= visible.minX, "got \(edge)")
+            let tall = MenuPanelController.frame(
+                button: NSRect(x: 10, y: 876, width: 40, height: 24),
+                size: NSSize(width: 386, height: 2000), visible: visible)
+            check("an over-tall panel is clamped to the bottom", tall.minY >= visible.minY)
+        }
+
         print(failures == 0
             ? "\nall checks passed"
             : "\n\(failures) check(s) FAILED")
