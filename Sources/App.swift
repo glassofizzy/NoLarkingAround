@@ -3,9 +3,11 @@ import Carbon.HIToolbox
 import SwiftUI
 
 /// Menu-bar agent. No dock icon (LSUIElement in Info.plist); the only UI is the
-/// status item and the takeover itself.
+/// status pill, its dropdown panel, and the takeover itself.
 final class AgentDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
+    private let menuModel = MenuViewModel()
+    private lazy var menuPanel = MenuPanelController(model: menuModel)
     private let takeover = TakeoverController()
     private var store: EventStore!
     private var scheduler: AlertScheduler!
@@ -25,19 +27,27 @@ final class AgentDelegate: NSObject, NSApplicationDelegate {
         scheduler = AlertScheduler(store: store, takeover: takeover, config: config)
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "◷ …"
+        if let button = statusItem.button {
+            button.title = "◷ …"
+            button.imagePosition = .imageOnly
+            button.target = self
+            button.action = #selector(togglePanel(_:))
+            // Fire on mouse-down, like a native menu, not on release.
+            button.sendAction(on: [.leftMouseDown, .rightMouseDown])
+        }
+        menuPanel.onAction = { [weak self] action in self?.handle(action) }
 
         scheduler.onStateChange = { [weak self] in
-            DispatchQueue.main.async { self?.refreshMenu() }
+            DispatchQueue.main.async { self?.refreshUI() }
         }
         scheduler.start()
 
-        // Countdown in the status title needs its own tick; polling is only every 60s.
+        // Countdown in the status pill needs its own tick; polling is only every 60s.
         menuTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
-            self?.refreshMenu()
+            self?.refreshUI()
         }
         registerPauseHotKey()
-        refreshMenu()
+        refreshUI()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -47,125 +57,75 @@ final class AgentDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Menu
 
-    private func refreshMenu() {
+    /// Repaints the status pill and feeds the panel a fresh snapshot. An open
+    /// panel observes the model, so it updates live on the 20s tick.
+    private func refreshUI() {
         let upcoming = scheduler.upcoming(limit: 3)
-        statusItem.button?.title = statusTitle(next: upcoming.first)
 
-        let menu = NSMenu()
-
-        if scheduler.authExpired {
-            let item = NSMenuItem(title: "⚠️  Lark sign-in expired", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            menu.addItem(item)
-            menu.addItem(NSMenuItem(title: "Re-authenticate Lark…",
-                                    action: #selector(reauth), keyEquivalent: ""))
-            menu.addItem(.separator())
-        } else if let err = scheduler.lastErrorText {
-            let item = NSMenuItem(title: "⚠️  \(err)", action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            menu.addItem(item)
-            menu.addItem(.separator())
-        }
-
-        if upcoming.isEmpty {
-            let item = NSMenuItem(title: "No meetings in the next 18 hours",
-                                  action: nil, keyEquivalent: "")
-            item.isEnabled = false
-            menu.addItem(item)
-        } else {
-            for a in upcoming {
-                let item = NSMenuItem(
-                    title: "\(Self.shortTime(a.start))  \(a.title)",
-                    action: nil, keyEquivalent: "")
-                item.isEnabled = false
-                menu.addItem(item)
+        let pill = PillState.make(next: upcoming.first, authExpired: scheduler.authExpired,
+                                  isPaused: scheduler.isPaused)
+        if let button = statusItem.button {
+            let scale = button.window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+            if let image = StatusPillRenderer.image(for: pill, scale: scale) {
+                button.image = image
+                button.title = ""
+            } else {
+                button.image = nil
+                button.title = pill.plainTitle
             }
-        }
-        menu.addItem(.separator())
-
-        if scheduler.isPaused {
-            menu.addItem(NSMenuItem(title: "Resume alerts",
-                                    action: #selector(resume), keyEquivalent: ""))
-        } else {
-            menu.addItem(NSMenuItem(title: "Pause for 1 hour  (⌥⌘P)",
-                                    action: #selector(pauseHour), keyEquivalent: ""))
-            menu.addItem(NSMenuItem(title: "Pause until tomorrow",
-                                    action: #selector(pauseTomorrow), keyEquivalent: ""))
+            button.setAccessibilityLabel(pill.plainTitle)
         }
 
-        let leadMenu = NSMenu()
-        for minutes in [1, 3, 5, 10] {
-            let item = NSMenuItem(title: "\(minutes) min",
-                                  action: #selector(setLead(_:)), keyEquivalent: "")
-            item.tag = minutes
-            item.state = config.leadMinutes == minutes ? .on : .off
-            item.target = self
-            leadMenu.addItem(item)
+        let snapshot = MenuSnapshot.make(
+            upcoming: upcoming, authExpired: scheduler.authExpired,
+            errorText: scheduler.lastErrorText, isPaused: scheduler.isPaused,
+            leadMinutes: config.leadMinutes)
+        if snapshot != menuModel.snapshot { menuModel.snapshot = snapshot }
+    }
+
+    @objc private func togglePanel(_ sender: NSStatusBarButton) {
+        menuPanel.toggle(relativeTo: sender)
+    }
+
+    private func handle(_ action: MenuAction) {
+        switch action {
+        case .reauth:        reauth()
+        case .pauseHour:     pauseHour()
+        case .pauseTomorrow: pauseTomorrow()
+        case .resume:        resume()
+        case .setLead(let m): setLead(m)
+        case .testTakeover:  testTakeover()
+        case .refresh:       refreshNow()
+        case .openConfig:    openConfig()
+        case .quit:          quit()
         }
-        let leadItem = NSMenuItem(title: "Lead time", action: nil, keyEquivalent: "")
-        leadItem.submenu = leadMenu
-        menu.addItem(leadItem)
-
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Test takeover now",
-                                action: #selector(testTakeover), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Refresh calendar",
-                                action: #selector(refreshNow), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Open config…",
-                                action: #selector(openConfig), keyEquivalent: ""))
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit No Larking Around",
-                                action: #selector(quit), keyEquivalent: "q"))
-
-        for item in menu.items where item.action != nil { item.target = self }
-        statusItem.menu = menu
-    }
-
-    private func statusTitle(next: MeetingAlert?) -> String {
-        if scheduler.authExpired { return "⚠️ Lark" }
-        if scheduler.isPaused { return "◷ paused" }
-        guard let next else { return "◷ clear" }
-        let mins = Int(next.minutesUntilStart().rounded())
-        let when = mins <= 0 ? "now" : (mins < 60 ? "\(mins)m" : "\(mins / 60)h\(mins % 60)m")
-        return "◷ \(when) · \(Self.truncate(next.title, 22))"
-    }
-
-    private static func truncate(_ s: String, _ n: Int) -> String {
-        s.count <= n ? s : String(s.prefix(n - 1)) + "…"
-    }
-
-    private static func shortTime(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        f.locale = Locale(identifier: "en_GB")
-        return f.string(from: date)
     }
 
     // MARK: - Actions
 
-    @objc private func pauseHour() { scheduler.pause(until: Date().addingTimeInterval(3600)) }
+    private func pauseHour() { scheduler.pause(until: Date().addingTimeInterval(3600)) }
 
-    @objc private func pauseTomorrow() {
+    private func pauseTomorrow() {
         let cal = Calendar.current
         let tomorrow = cal.date(byAdding: .day, value: 1, to: Date()) ?? Date()
         let morning = cal.date(bySettingHour: 8, minute: 0, second: 0, of: tomorrow) ?? tomorrow
         scheduler.pause(until: morning)
     }
 
-    @objc private func resume() { scheduler.resume() }
+    private func resume() { scheduler.resume() }
 
-    @objc private func setLead(_ sender: NSMenuItem) {
-        config.leadMinutes = sender.tag
+    private func setLead(_ minutes: Int) {
+        config.leadMinutes = minutes
         try? config.save()
         scheduler.update(config: config)
-        refreshMenu()
+        refreshUI()
     }
 
-    @objc private func refreshNow() { scheduler.poll() }
+    private func refreshNow() { scheduler.poll() }
 
     /// Previews the takeover against the real next meeting where possible, so Join
     /// goes somewhere real instead of a placeholder URL.
-    @objc private func testTakeover() {
+    private func testTakeover() {
         if let real = scheduler.upcoming(limit: 1).first {
             takeover.show(alert: real, leadMinutes: config.leadMinutes,
                           soundName: config.soundName) { [weak self] action in
@@ -194,7 +154,7 @@ final class AgentDelegate: NSObject, NSApplicationDelegate {
 
     private func openJoin(_ url: URL) { NSWorkspace.shared.open(url) }
 
-    @objc private func openConfig() {
+    private func openConfig() {
         if !FileManager.default.fileExists(atPath: Config.fileURL.path) {
             try? config.save()
         }
@@ -205,7 +165,7 @@ final class AgentDelegate: NSObject, NSApplicationDelegate {
     /// `.command` file via LaunchServices rather than AppleScript-driving Terminal —
     /// the AppleScript route needs Automation (Apple Events) permission that this
     /// LaunchAgent-run app has no reliable way to prompt for, and failed silently.
-    @objc private func reauth() {
+    private func reauth() {
         let script = "#!/bin/bash\nexec \"\(config.larkCLIPath)\" auth login\n"
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("nolarkingaround-reauth-\(UUID().uuidString).command")
@@ -221,7 +181,7 @@ final class AgentDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc private func quit() { NSApp.terminate(nil) }
+    private func quit() { NSApp.terminate(nil) }
 
     // MARK: - ⌥⌘P global hot key
     //
@@ -234,9 +194,9 @@ final class AgentDelegate: NSObject, NSApplicationDelegate {
         AgentDelegate.hotKeyHandler = { [weak self] in
             guard let self else { return }
             self.scheduler.togglePause()
-            // Feedback is the status title flipping to "◷ paused"; a real
+            // Feedback is the status pill flipping to "Paused"; a real
             // notification would need a notarised bundle and a permission prompt.
-            self.refreshMenu()
+            self.refreshUI()
             NSSound(named: self.scheduler.isPaused ? "Bottle" : "Pop")?.play()
         }
 
