@@ -104,6 +104,8 @@ enum SelfTest {
             s.evaluate()
             check("still only the one takeover", p.shown.count == 1,
                   "shown=\(p.shown.count)")
+            check("dismissed meeting stays in the menu while ongoing",
+                  s.upcoming().count == 1, "upcoming=\(s.upcoming().count)")
         }
 
         print("\n3. Join opens the link and suppresses the at-start alert")

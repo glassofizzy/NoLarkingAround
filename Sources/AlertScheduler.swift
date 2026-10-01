@@ -107,11 +107,12 @@ final class AlertScheduler {
     var authExpired: Bool { lastError?.isAuthExpired ?? false }
     var lastErrorText: String? { lastError.map(\.description) }
 
-    /// Alertable meetings still ahead of us, soonest first.
+    /// Alertable meetings not yet over (ongoing included), soonest first. Dismissed
+    /// ones stay listed: Dismiss silences the takeover, it doesn't cancel the meeting.
     func upcoming(limit: Int = 3) -> [MeetingAlert] {
         let now = clock()
         return currentAlerts()
-            .filter { $0.end > now && !(states[$0.eventID]?.dismissed ?? false) }
+            .filter { $0.end > now }
             .sorted { $0.start < $1.start }
             .prefix(limit)
             .map { $0 }
