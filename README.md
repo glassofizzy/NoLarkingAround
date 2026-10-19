@@ -80,7 +80,9 @@ Swift compiler.
 
 The menu bar shows a yellow pill with a countdown to the next meeting (`[12m] Metric
 Tree`). Clicking it opens a dropdown in the takeover's style, listing upcoming
-meetings by day. From there you can pause, change the lead time, run a test
+meetings by day, with the booked room in smaller text beneath each title (CPT
+preferred for meetings across offices). Hover to read the full title and location.
+From there you can pause, change the lead time, run a test
 takeover and re-authenticate. The dropdown works with the keyboard too: ↑ ↓ to move,
 Return to choose, → to open the lead-time options, Esc to close.
 

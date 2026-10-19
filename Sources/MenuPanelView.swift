@@ -164,18 +164,27 @@ private struct Notice: View {
 private struct MeetingRowView: View {
     let row: MenuMeetingRow
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             Text(row.time)
                 .font(DS.mono(14, 600))
-            Text(row.title)
-                .font(DS.display(15, 600))
-                .lineLimit(1)
-                .truncationMode(.tail)
+                .fixedSize()
+            VStack(alignment: .leading, spacing: 3) {
+                Text(row.title)
+                    .font(DS.display(15, 600))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                if let location = row.location {
+                    Text(location)
+                        .font(DS.mono(11, 500))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+            }
             Spacer(minLength: 0)
         }
         .foregroundColor(row.isNext ? DS.ink : DS.muted)
         .padding(.horizontal, 12)
-        .frame(height: 38)
+        .frame(height: row.location == nil ? 38 : 54)
         .background(
             RoundedRectangle(cornerRadius: 10)
                 .fill(row.isNext ? DS.ground : Color.clear)
@@ -185,7 +194,8 @@ private struct MeetingRowView: View {
                 .strokeBorder(DS.ink, lineWidth: row.isNext ? 2 : 0)
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(row.time) \(row.title)\(row.isNext ? ", next" : "")")
+        .accessibilityLabel("\(row.time) \(row.title)\(row.location.map { ", location: \($0)" } ?? "")\(row.isNext ? ", next" : "")")
+        .help([row.title, row.location].compactMap { $0 }.joined(separator: "\n"))
     }
 }
 

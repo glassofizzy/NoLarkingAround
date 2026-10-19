@@ -244,17 +244,19 @@ func snapshotMenu(to path: String, paused: Bool, authExpired: Bool, expanded: Bo
         let day = cal.date(byAdding: .day, value: dayOffset, to: now) ?? now
         return cal.date(bySettingHour: h, minute: m, second: 0, of: day) ?? now
     }
-    func meeting(_ title: String, _ start: Date) -> MeetingAlert {
+    func meeting(_ title: String, _ start: Date, room: String? = nil) -> MeetingAlert {
         MeetingAlert(eventID: title, title: title, start: start,
                      end: start.addingTimeInterval(1800), timeRange: "", durationLabel: "",
-                     attendanceLabel: "", roomSlab: nil, floorLabel: nil, hostName: "",
+                     attendanceLabel: "", roomSlab: room, floorLabel: nil, hostName: "",
                      hostTag: "", hostIsMe: false, participantNames: [], moreLabel: nil,
                      joinURL: nil, clashLabel: nil)
     }
     // Sample day relative to "now" so the header reads TODAY / TOMORROW.
     let upcoming = [
-        meeting("Payment x Accomm Biweekly", now.addingTimeInterval(67 * 60)),
-        meeting("Google & Expedia UGC Accom Content", now.addingTimeInterval(3 * 3600)),
+        meeting("Payment x Accomm Biweekly", now.addingTimeInterval(67 * 60),
+                room: "CPT-L10-A13(2)"),
+        meeting("Google & Expedia UGC Accom Content", now.addingTimeInterval(3 * 3600),
+                room: "CPT-L10-A9(7)"),
         meeting("GHA Multi-Rate Project - Weekly Sync", at(1, 9, 30)),
     ]
 
