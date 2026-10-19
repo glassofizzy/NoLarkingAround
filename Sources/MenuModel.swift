@@ -9,6 +9,7 @@ import Foundation
 struct MenuMeetingRow: Equatable {
     let time: String
     let title: String
+    let location: String?
     let isNext: Bool
 }
 
@@ -48,7 +49,8 @@ struct MenuSnapshot: Equatable {
                 currentDay = day
                 rows = []
             }
-            rows.append(MenuMeetingRow(time: shortTime(a.start), title: a.title, isNext: i == 0))
+            rows.append(MenuMeetingRow(time: shortTime(a.start), title: a.title,
+                                       location: a.roomSlab, isNext: i == 0))
         }
         if let d = currentDay {
             groups.append(MenuDayGroup(header: header(for: d, now: now, calendar: calendar),
